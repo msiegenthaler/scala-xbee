@@ -9,6 +9,7 @@ class ScalaXbeeProject(info: ProjectInfo) extends DefaultProject(info) with Auto
   val logbackcore = "ch.qos.logback" % "logback-core" % "0.9.20"
   val logbackclassic = "ch.qos.logback" % "logback-classic" % "0.9.20"
   
+  override def testClasspath = super.testClasspath +++ ("lib-test" / "scalabase_2.8.0-SNAPSHOT-2.0.0-SNAPSHOT-test.jar") 
   val scalatest = "org.scalatest" % "scalatest" % "1.0.1-for-scala-2.8.0.RC1-SNAPSHOT" % "test"
   val toolsSnapshot = ScalaToolsSnapshots
 }
