@@ -60,7 +60,7 @@ case class XBeeAddress64(value: Long) extends XBeeAddress {
     "XBeeAddress64(0x"+("0" * (16-s.length) + s).toUpperCase+")"
   }
 }
-object XBeeAddress64Broadcast extends XBeeAddress64(0xFFFF)  // see XBee-Addressing
+object XBeeAddress64Broadcast extends XBeeAddress64(0xFFFFL)  // see XBee-Addressing
 
 /**
  * Lower 32 bit of a 64 bit address
