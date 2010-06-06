@@ -47,6 +47,8 @@ object SerialPort {
   }
   
   private class SerialPortImpl(identifier: gnu.io.CommPortIdentifier, baudRate: Int) extends IOStreamPort[Process] {
+    protected override val readDelay: Duration = 30 ms
+
     protected[this] override def openStreams: (InputStream, OutputStream, Process) @processCps = {
       val timeout = 5 s
       val port = identifier.open("Scala", timeout.amount(Milliseconds).toInt).asInstanceOf[gnu.io.SerialPort]
