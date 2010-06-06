@@ -202,7 +202,7 @@ object XBeeParsing {
         t => Some(Duration((t & 0xFF) * 100, Milliseconds))
       )
     val NT = <<( AtCommandPreample('N','T'), time )>>
-    val NT_response = <<( AtResponsePreample('N','D'), time )>>
+    val NT_response = <<( AtResponsePreample('N','T'), time )>>
     
     //TODO more AT commands
   }
