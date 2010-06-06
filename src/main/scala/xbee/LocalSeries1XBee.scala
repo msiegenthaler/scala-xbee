@@ -73,15 +73,15 @@ class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee 
       object LowFailed
       val collector = spawnChild(Required) {
         val high = receiveWithin(5 seconds) {
-          case high: XBeeAddress64_High => Some(high)
-          case HighFailed => None
-          case Timeout => None
+          case high: XBeeAddress64_High => noop; Some(high)
+          case HighFailed => noop; None
+          case Timeout => noop; None
         }
         val n = high.flatMap_cps { high => 
           val low = receiveWithin(5 seconds) {
-            case low: XBeeAddress64_Low => Some(low)
-            case LowFailed => None
-            case Timeout => None
+            case low: XBeeAddress64_Low => noop; Some(low)
+            case LowFailed => noop; None
+            case Timeout => noop; None
           }
           low.map(_ + high)
         }
