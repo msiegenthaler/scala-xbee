@@ -20,10 +20,10 @@ class CommunicationPortLowLevelLocalXBeeInApiMode protected(port: CommunicationP
   }
   protected[this] override def messageHandler(state: State) = {
     case DataReceived(this.port, data) =>
-      if (log.isTraceEnabled) log.trace("XBee: Received data fragement {}", byteListToHex(data))
+      log.trace("XBee: Received data fragement {}", byteListToHex(data))
       val buffer = state.buffer ++ data
       val afterBuffer = processBuffer { data =>
-        if (log.isDebugEnabled) log.debug("XBee: Received packet {}", byteListToHex(data))
+        log.debug("XBee: Received packet {}", byteListToHex(data))
         state.sendTo.foreach(_ ! ReceivedCommand(this, data))
       }(buffer)
       Some(state.withBuffer(afterBuffer))
@@ -43,8 +43,8 @@ class CommunicationPortLowLevelLocalXBeeInApiMode protected(port: CommunicationP
   override def sendCommand(command: Seq[Byte]) = cast { state =>
     val packet = UnescapedPacket(command)
     // trace
-    if (log.isDebugEnabled) log.debug("XBee: Sending packet with payload: {}", byteListToHex(command)) 
-    if (log.isTraceEnabled) log.trace("XBee: Sending data {}", byteListToHex(packet))
+    log.debug("XBee: Sending packet with payload: {}", byteListToHex(command)) 
+    log.trace("XBee: Sending data {}", byteListToHex(packet))
     // eot
     port send packet.iterator
     state
