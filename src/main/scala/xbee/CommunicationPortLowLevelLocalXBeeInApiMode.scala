@@ -55,6 +55,7 @@ class CommunicationPortLowLevelLocalXBeeInApiMode protected(port: CommunicationP
   }
 
   override def close = cast_ { state =>
+    log.debug("Closing")
     port.close
     None
   }

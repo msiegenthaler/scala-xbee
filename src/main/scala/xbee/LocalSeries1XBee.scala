@@ -5,6 +5,7 @@ import ch.inventsoft.scalabase.oip._
 import ch.inventsoft.scalabase.process._
 import cps.CpsUtils._
 import ch.inventsoft.scalabase.time._
+import ch.inventsoft.scalabase.extcol.ListUtil._
 import Process._
 import Messages._
 import XBeeParsing._
@@ -111,6 +112,7 @@ class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee 
       )
   }}
   protected[this] def cacheAddress(address: XBeeAddress64) = cast { state =>
+    log.debug("Address of local xbee is {}", address)
     state.withAddress(address)
   }
 
@@ -131,11 +133,13 @@ class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee 
 
   override def alias(address: Option[XBeeAddress16]) = cast { state =>
     val a = address.getOrElse(XBeeAddress16Disabled)
+    log.debug("Setting alias address to {}", address)
     sendCommandNoFrame(AT.MY_set(NoFrameId, a))(state)
   }
   
   override def sendPacket(to: XBeeAddress, data: Seq[Byte]) = cast { state => 
     val d =  data.take(maxDataPerPacket).toList
+    log.debug("Sending packet {} to {}", byteListToHex(d), to)
     to match {
     case to: XBeeAddress64 =>
       sendCommandNoFrame(TX64(NoFrameId, to, TransmitOptionNormal,d))(state)
@@ -145,22 +149,27 @@ class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee 
   }
   override def broadcastPacket(data: Seq[Byte]) = cast { state =>
     val d =  data.take(maxDataPerPacket).toList
+    log.debug("Broadcasting packet {}", byteListToHex(d))
+    //TODO Xbee actually supports tracking of broadcast sends
     sendCommandNoFrame(TX64(NoFrameId, XBeeAddress64Broadcast, TransmitOption(true,true), d))(state)
   }
 
   
   override def sendTrackedPacket(to: XBeeAddress, data: Seq[Byte]) = call_? { (state, reply) => 
     val d =  data.take(maxDataPerPacket).toList
+    log.debug("Sending tracked packet {} to {}", byteListToHex(d), to)
     to match {
       case to: XBeeAddress64 =>
         sendCommandWithFrame(f => TX64(f, to, TransmitOptionNormal,d)) { frame => {
           case TX_status((`frame`,status),Nil) =>
+            log.debug("Sending tracked packet to {} completed with result {}", to, status)
             reply(status)
             UnmodifyingEndOfCommand
         }}(state)
       case to: XBeeAddress16 =>
         sendCommandWithFrame(f => TX16(f, to, TransmitOptionNormal,d)) { frame => {
           case TX_status((`frame`,status),Nil) =>
+            log.debug("Sending tracked packet to {} completed with result {}", to, status)
             reply(status)
             UnmodifyingEndOfCommand
         }}(state)
@@ -174,10 +183,12 @@ class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee 
         val item = DiscoveredXBeeDevice(a64, a16o, Some(signal))
         (s: State) => (CommandContinues(ndHandler(frame, item :: soFar)), s)
       case AT.ND_end((`frame`,status),rest) =>
+        log.debug("Discovered devices: {}", soFar)
         reply(soFar.reverse)
         UnmodifyingEndOfCommand
     }
   
+    log.trace("Starting device discovery...")
     executeCommands(state)(
       sendCommandWithFrame(f => AT.NT(f, timeout)) { frame => {
         case AT.NT_response((`frame`,status),timeout) => UnmodifyingEndOfCommand
@@ -187,6 +198,7 @@ class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee 
   }
   
   override def close = cast_ { state =>
+    log.debug("Closing")
     lowLevel.close
     None
   }
