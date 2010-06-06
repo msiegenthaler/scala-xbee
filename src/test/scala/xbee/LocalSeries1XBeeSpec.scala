@@ -128,7 +128,6 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers {
   }
   
   describe("LocalSeries1XBee") {
-    /*
     it_("should have a 64 bit address") {
       val (device, xbee) = initialize
       // is cached
@@ -385,8 +384,7 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers {
       }
       stop(device,xbee)
     }
-    */
-    
+
     it_("should be possible to discover nodes") {
       val (device,xbee) = initialize
       val node1 = DiscoveredXBeeDevice(XBeeAddress64(0x0102030405060708L),None,Some(SignalStrength(-10)))
@@ -403,14 +401,21 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers {
       
       val cs = device.commandsInBuffer
       cs match {
-        case AT.NT((frameNt,timeout),rest) :: AT.ND((frame),Nil) :: Nil =>
+        case AT.NT((frameNt,timeout),rest) :: Nil =>
           device.sendResponse(AT.NT_response((frameNt,AT.StatusOk),timeout))
+        case other => fail("Fail nt "+other)
+      }
+      sleep(200 ms)
+      
+      val cs2 = device.commandsInBuffer
+      cs2 match {
+        case AT.ND((frame),Nil) :: Nil =>
           nodes.foreach_cps { node =>
-            sleep(timeout / (nodes.size+1))
+            sleep((1 s) / (nodes.size+1))
             device.sendResponse(nToC(frame, node))
           }
           device.sendResponse(AT.ND_end((frame,AT.StatusOk)))
-        case other => fail("Fail "+other)
+        case other => fail("Fail nd "+other)
       }
       
       val r = receiveWithin(5 s) { discover }
@@ -429,11 +434,16 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers {
       
       val cs = device.commandsInBuffer 
       cs match {
-        case AT.NT((frameNt,timeout),rest) :: AT.ND((frame),Nil) :: Nil =>
+        case AT.NT((frameNt,timeout),Nil) :: Nil =>
           device.sendResponse(AT.NT_response((frameNt,AT.StatusOk),timeout))
-          sleep(timeout - (200 ms))
+        case other => fail("Fail nt "+other)
+      }
+      sleep(500 ms)
+      val cs2 = device.commandsInBuffer
+      cs2 match {
+        case AT.ND((frame),Nil) :: Nil =>
           device.sendResponse(AT.ND_end((frame,AT.StatusOk)))
-        case other => fail("Fail "+other)
+        case other => fail("Fail nd "+other)
       }
       
       assertEquals(receiveWithin(5 s) { discover }, Nil)
