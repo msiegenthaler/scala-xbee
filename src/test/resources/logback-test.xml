@@ -5,8 +5,7 @@
     </layout>
   </appender>
 
-  <logger name="ch.inventsoft.xbee" level="debug"/>
-  <logger name="ch.inventsoft.gidaivel" level="trace"/>
+  <logger name="ch.inventsoft.xbee" level="trace"/>
   <logger name="ch.inventsoft.scalabase" level="info"/>
   <logger name="ch.inventsoft.scalabase.process" level="info"/>
 	

@@ -2,7 +2,7 @@ import sbt._
 
 class ScalaXbeeProject(info: ProjectInfo) extends DefaultProject(info) with AutoCompilerPlugins {      
   val continuations = compilerPlugin("org.scala-lang.plugins" % "continuations" % "2.8.0-SNAPSHOT")
-  override def compileOptions = CompileOption("-P:continuations:enable") :: super.compileOptions.toList
+  override def compileOptions = CompileOption("-P:continuations:enable") :: CompileOption("-unchecked") :: super.compileOptions.toList
   
       
   val slf4j = "org.slf4j" % "slf4j-api" % "1.5.11"
