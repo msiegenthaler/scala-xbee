@@ -321,6 +321,26 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers {
       }
       stop(device,xbee)
     }
+    it_("should be possible to receive a packet from another xbee (real-world)") {
+      val (device, xbee) = initialize
+      
+      xbee.incomingMessageProcessor(Some(self))
+      sleep(200 ms)
+      
+      val inData = 0x80 :: 0x00 :: 0x13 :: 0xA2 :: 0x00 :: 0x40 :: 0x3A :: 0xD0 :: 0xA6 :: 0x30 :: 0x00 :: 0x04 :: 0x00 :: 0x1A :: 0x00 :: 0x07 :: 0x00 :: 0x00 :: Nil map(_.toByte)
+      device.sendResponse(inData)
+      
+      receiveWithin(1 s) {
+        case XBeeDataPacket(receiver, source, signal, broadcast, d) =>
+          receiver should be(xbee)
+          source should be(XBeeAddress64(0x0013A200403AD0A6L))
+          signal should be(Some(SignalStrength(-48)))
+          broadcast should be(false)
+          d should be(0x04 :: 0x00 :: 0x1A :: 0x00 :: 0x07 :: 0x00 :: 0x00 :: Nil map(_.toByte))
+        case other => fail("Fail "+other)  
+      }
+      stop(device,xbee)
+    }
     it_("should be possible to receive packets broadcastet by other xbees (64-bit)") {
       val (device, xbee) = initialize
       val sourceAddress = XBeeAddress64(0x0102030405060708L)
