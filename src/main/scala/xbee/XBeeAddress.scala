@@ -1,4 +1,5 @@
-package ch.inventsoft.xbee
+package ch.inventsoft
+package xbee
 
 
 /**

@@ -1,12 +1,11 @@
-package ch.inventsoft.xbee
+package ch.inventsoft
+package xbee
 
-import ch.inventsoft.scalabase.communicationport._
-import ch.inventsoft.scalabase.oip._
-import ch.inventsoft.scalabase.process._
-import cps.CpsUtils._
-import ch.inventsoft.scalabase.time._
-import ch.inventsoft.scalabase.extcol.ListUtil._
-import Process._
+import scalabase.io._
+import scalabase.oip._
+import scalabase.process._
+import scalabase.time._
+import scalabase.extcol.ListUtil._
 import Messages._
 import XBeeParsing._
 
@@ -16,257 +15,304 @@ import XBeeParsing._
  * This implementation bases on a LocalLowLevelXBee that takes care of the actual communication with
  * the XBee device.
  */
-object LocalSeries1XBee extends SpawnableCompanion[LocalXBee with Spawnable] {
-  def apply(lowLevel: LocalLowLevelXBee)(as: SpawnStrategy) = start(as) {
-    new LocalSeries1XBee(lowLevel)
+trait LocalSeries1XBee extends LocalXBee with StateServer {
+  override val maxDataPerPacket = 100
+  protected[this] val getFrameTimeout = 1 s
+  protected[this] val localCommandTimeout = 5 s
+  protected[this] val sendTimeout = 2 minutes
+
+  protected[this] type State = S1State
+  protected case class S1State(cachedAddress: Option[XBeeAddress64], multiplex: List[Process], frame: FrameId, incomingHandler: IncomingHandler, lowLevel: LocalLowLevelXBee, reader: Process) {
+    def addMultiplex(process: Process) = copy(multiplex=process :: multiplex)
+    def removeMultiplex(process: Process) = copy(multiplex=multiplex.filterNot(_ == process))
+    def nextFrame = copy(frame=frame++)
   }
- 
-  protected class LocalSeries1XBee protected(lowLevel: LocalLowLevelXBee) extends LocalXBee with StateServer[State] {
-    protected type Command = FrameId => Seq[Byte]
-    
-    override val maxDataPerPacket = 100
-    protected[this] val getFrameTimeout = 1 s
-    protected[this] val localCommandTimeout = 5 s
-    protected[this] val sendTimeout = 2 minutes
-    
-    override protected[this] def initialState = {
-      lowLevel.setIncomingCommandProcessor(Some(process))
-      spawnChild(NotMonitored) { 
-        //prefetch address
-        receiveWithin(5 s)(address.option)
-      }
-      State(None, Nil, FrameId(), None)
-    }
+  protected case class LowLevelCommand(command: Command)
+  protected type FramedCommand = FrameId => Seq[Byte]
+  protected type IncomingHandler = ReceivedXBeeDataPacket => Unit @process
 
-    protected[this] override def messageHandler(state: State) = {
-      case cmd @ ReceivedCommand(this.lowLevel, data) =>
-        data match {
-          case RX64((address, signal, option, data), Nil) =>
-            noop
-            log.debug("Received packet from {}: {} (signal: {}, options: {})", address, byteListToHex(data), signal, option)
-            state.forwardTo.foreach(_ ! XBeeDataPacket(this, address, Some(signal), option.addressBroadcast || option.panBroadcast, data))
-            Some(state)
-          case RX16((address, signal, option, data), Nil) =>
-            noop
-            log.debug("Received packet from {}: {} (signal: {}, options: {})", address, byteListToHex(data), signal, option)
-            state.forwardTo.foreach(_ ! XBeeDataPacket(this, address, Some(signal), option.addressBroadcast || option.panBroadcast, data))
-            Some(state)
-          case other =>
-            noop
-            state.multiplex.foreach { p => 
-              p ! cmd
-            }
-            Some(state)
+  protected[this] def openLowLevel: LocalLowLevelXBee @process
+  override protected[this] def init = {
+    val lowLevel = ResourceManager[LocalLowLevelXBee](openLowLevel, _.close).receive.resource
+    val reader = spawnChild(Required)(readFromLowLevel(lowLevel))
+    spawnChild(NotMonitored) { 
+      //prefetch address
+      address
+    }
+    S1State(None, Nil, FrameId(), _ => noop, lowLevel, reader)
+  }
+  /** Reader fun, that forwards all data read from the lowLevel */
+  protected[this] def readFromLowLevel(lowLevel: LocalLowLevelXBee): Unit @process = {
+    val read = lowLevel.read(1 s)
+    read match {
+      case Some(Data(items)) =>
+        items.foreach_cps { cmd =>
+          log.trace("Received LowLevel command {}", byteListToHex(cmd))
+          val c = LowLevelCommand(cmd)
+          process ! c
         }
-      case end: ProcessEnd => //one of the subprocesses terminated, remove it
-        end match {
-          case ProcessExit(_) => () //normal termination
-          case ProcessKill(p, proc, reason) => 
-            if (proc == this.process) () //we killed it, ignore
-            else throw new RuntimeException("Subprocess was killed: "+reason)
-          case ProcessCrash(p, reason) => //crash occured, restart ourself
-            throw reason
+        receiveNoWait {
+          case Timeout => readFromLowLevel(lowLevel) //loop
+          case Terminate => noop // end
         }
+      case Some(EndOfData) =>
+        log.trace("Received EndOfData")
         noop
-        Some(state.removeMultiplex(end.process))
-    }  
-    protected[this] def child[A](body: => A @processCps) = call_? { (state: State, reply: A => Unit) =>
-      val p = spawnChild(Monitored) {
-        val res = body
-        reply(res)
+      case None => //timeout
+        receiveNoWait {
+          case Timeout => readFromLowLevel(lowLevel) //loop
+          case Terminate => noop // end
+        }
+    }
+  }
+  protected[this] override def handler(state: State) = super.handler(state).orElse_cps {
+    case llc @ LowLevelCommand(command) => command match {
+      case RX64((address, signal, option, data), Nil) =>
+        log.debug("Received packet from {}: {} (signal: {}, options: {})",
+                  address, byteListToHex(data), signal, option)
+        val bc = option.addressBroadcast || option.panBroadcast
+        val packet = ReceivedXBeeDataPacket(address, Some(signal), bc, data)
+        state.incomingHandler(packet)
+        Some(state)
+      case RX16((address, signal, option, data), Nil) =>
+        log.debug("Received packet from {}: {} (signal: {}, options: {})",
+                  address, byteListToHex(data), signal, option)
+        val bc = option.addressBroadcast || option.panBroadcast
+        val packet = ReceivedXBeeDataPacket(address, Some(signal), bc, data)
+        state.incomingHandler(packet)
+        Some(state)
+      case other =>
+        state.multiplex.foreach_cps(_ ! llc)
+        Some(state)
+    }
+    case end: ProcessEnd => //one of the subprocesses terminated, remove it
+      end match {
+        case ProcessExit(_) => () //normal termination
+        case ProcessKill(p, proc, reason) => 
+          if (proc == this.process) () //we killed it, ignore
+          else throw new RuntimeException("Subprocess was killed: "+reason)
+        case ProcessCrash(p, reason) => //crash occured, restart ourself
+          throw reason
       }
-      Some(state.addMultiplex(p))
-    }
-    
-    protected[this] def sendWithoutFrame(command: Command): Unit = {
-      lowLevel sendCommand command(NoFrameId)
-    }
-    protected[this] def sendWithFrame_(command: Command): MessageSelector[FrameId] = call { state =>
-      val frame = state.frame
-      lowLevel sendCommand command(frame)
-      (frame, state.nextFrame)
-    }
-    protected[this] def sendWithFrame(command: Command): FrameId @processCps = {
-      val f = receiveWithin(getFrameTimeout) { sendWithFrame_(command).option }
-      f.getOrElse(throw new RuntimeException("Could not get a frame id"))
-    }    
+      noop
+      Some(state.removeMultiplex(end.process))
+  }
+  protected[this] override def termination(state: State) = {
+    log.debug("Closing the XBee")
+  }
 
-    override def address = call_? { (state, reply) =>
-      def requestSLAddress(retryCount: Int, sh: XBeeAddress64_High): Option[XBeeAddress64] @processCps = retryCount match {
+  protected[this] def child[A](body: => A @process): Selector[A] @process = {
+    this ! new ModifyStateMessage with MessageWithSimpleReply[A] {
+      override def execute(state: State) = {
+        val p = spawnChild(Monitored) {
+          reply(body)
+        }
+        state.addMultiplex(p)
+      }
+    }
+  }
+    
+  protected[this] def sendWithoutFrame(command: FramedCommand): Unit @process = cast { state =>
+    state.lowLevel.writeCast(command(NoFrameId))
+    state
+  }
+  protected[this] def sendWithFrame_(command: FramedCommand): Selector[FrameId] @process = call { state =>
+    val frame = state.frame
+    state.lowLevel writeCast command(frame)
+    (frame, state.nextFrame)
+  }
+  protected[this] def sendWithFrame(command: FramedCommand): FrameId @process = {
+    val f = receiveWithin(getFrameTimeout) { sendWithFrame_(command).option }
+    f.getOrElse(throw new RuntimeException("Could not get a frame id"))
+  }
+
+  override def setMessageHandler(handler: ReceivedXBeeDataPacket => Unit @process) = cast { state =>
+    state.copy(incomingHandler = handler)
+  }
+
+  override def address = {
+    def requestSLAddress(retryCount: Int, sh: XBeeAddress64_High): Option[XBeeAddress64] @process = {
+      retryCount match {
         case 0 => None
         case retryCount =>
           val frame = sendWithFrame(f => AT.SL_read(f))
           log.trace("Send SL request")
           receiveWithin(localCommandTimeout) {
-            case ReceivedCommand(_, AT.SL_response(((`frame`, status), a), Nil)) => if (status == AT.StatusOk) {
+            case LowLevelCommand(AT.SL_response(((`frame`, status), a), Nil)) => if (status == AT.StatusOk) {
               //Got a valid response, now we got SL and SH
               log.trace("Got SL response {}", a)
               Some(sh + a)
             } else requestSLAddress(retryCount - 1, sh)
-            case Timeout => requestSLAddress(retryCount - 1, sh)
+            case Timeout =>
+              log.trace("No response to SL within timout")
+              requestSLAddress(retryCount - 1, sh)
+            case other =>
+println("### "+other); None
           }
       }
-      def requestAddress(retryCount: Int): Option[XBeeAddress64] @processCps = retryCount match {
+    }
+    /** request the 64-bit address (sh&sl) */
+    def requestAddress(retryCount: Int): Option[XBeeAddress64] @process = {
+      retryCount match {
         case 0 => None
         case retryCount =>
           val frame = sendWithFrame(f => AT.SH_read(f))
           log.trace("Send SH request")
           receiveWithin(localCommandTimeout) {
-            case ReceivedCommand(_, AT.SH_response(((`frame`, status), a), Nil)) => if (status == AT.StatusOk) {
+            case LowLevelCommand(AT.SH_response(((`frame`, status), a), Nil)) => if (status == AT.StatusOk) {
               //Got a valid response, now get SL
               log.trace("Got SH response {}", a)
               requestSLAddress(retryCount, a)
-            } else requestAddress(retryCount - 1)        
-            case Timeout => requestAddress(retryCount - 1)
+            } else requestAddress(retryCount - 1)
+            case Timeout =>
+              log.trace("No response to SH within timout")
+              requestAddress(retryCount - 1)
           }
       }
-      state.cachedAddress match {
-        case Some(address) =>
-          reply(address)
-          Some(state)
-        case None =>
-          val p = spawnChild(Monitored) {
-            val address = requestAddress(3)
-            address match {
-              case Some(address) =>
-                log.debug("The local xbee address (64-bit) is {}", address)
-                cacheAddress(address)
-                reply(address)
-              case None =>
-                log error "Could not get the 64-bit address of the local xbee"
-                reply(XBeeAddress64(0))
+    }
+
+    this ! new ModifyStateMessage with MessageWithSimpleReply[XBeeAddress64] {
+      override def execute(state: State) = {
+        state.cachedAddress match {
+          case Some(address) =>
+            reply(address)
+            state
+          case None => 
+            val p = spawnChild(Monitored) {
+              val address = requestAddress(3)
+              address match {
+                case Some(address) =>
+                  log.debug("The local xbee address (64-bit) is {}", address)
+                  cacheAddress(address)
+                  reply(address)
+                case None =>
+                  log error "Could not get the 64-bit address of the local xbee"
+                  reply(XBeeAddress64(0))
+              }
             }
-          }
-          Some(state.addMultiplex(p))
+            state.addMultiplex(p)
+        }
       }
     }
-    protected[this] def cacheAddress(address: XBeeAddress64) = cast { state =>
+  }
+
+  protected[this] def cacheAddress(address: XBeeAddress64) = cast { state =>
+    if (state.cachedAddress.isEmpty) { 
       log.trace("Caching local xbee address {}", address)
-      if (state.cachedAddress.isEmpty) state.withCachedAddress(Some(address))
-      else state
+      state.copy(cachedAddress = Some(address))
+    } else state
+  }
+
+  override def alias = child {
+    def fetchAlias = {
+      val frame = sendWithFrame(f => AT.MY_read(f))
+      receiveWithin(localCommandTimeout) {
+        case LowLevelCommand(AT.MY_response(((`frame`, status), a), Nil)) => Some(a)
+        case Timeout => None
+      }
+    }
+    def fetchWithRetry(left: Int): Option[XBeeAddress16] @process = left match {
+      case 0 => None
+      case left =>
+        val res = fetchAlias
+        if (res.isDefined) {
+          noop
+          res
+        } else fetchWithRetry(left - 1)
     }
 
-    override def alias = child {
-      def fetchAlias = {
-        val frame = sendWithFrame(f => AT.MY_read(f))
-        receiveWithin(localCommandTimeout) {
-          case ReceivedCommand(_, AT.MY_response(((`frame`, status), a), Nil)) => Some(a)
-          case Timeout => None
-        }
-      }
-      def fetchWithRetry(left: Int): Option[XBeeAddress16] @processCps = left match {
-        case 0 => None
-        case left =>
-          val res = fetchAlias
-          if (res.isDefined) {
-            noop
-            res
-          } else fetchWithRetry(left - 1)
-      }
-
-      val x = fetchWithRetry(3)
-      x match { 
-        case Some(a) =>
-          val address = if (a == XBeeAddress16Disabled) None else Some(a)
-          log.debug("The alias of the local xbee is {}", address)
-          address
-        case None =>
-          log.error("Could not get the alias of the local xbee")
-          None
-      }
-    }
-    
-    override def alias(alias: Option[XBeeAddress16]) = cast { state =>
-      log.debug("Setting alias address to {}", alias)
-      val a = alias.getOrElse(XBeeAddress16Disabled)
-      sendWithoutFrame(f => AT.MY_set(f, a))
-      //TODO use frame id to get confirmation?
-      state
-    }
-    
-    override def sendPacket(to: XBeeAddress, data: Seq[Byte]) = {
-      val d =  data.take(maxDataPerPacket).toList
-      log.debug("Sending untracket packet {} to {}", byteListToHex(d), to)
-      to match {
-        case to: XBeeAddress64 =>
-          sendWithoutFrame(f => TX64(f, to, TransmitOptionNormal, d))
-        case to: XBeeAddress16 =>
-          sendWithoutFrame(f => TX16(f, to, TransmitOptionNormal, d))
-      }
-    }
-
-    override def sendTrackedPacket(to: XBeeAddress, data: Seq[Byte]) = child {
-      val d =  data.take(maxDataPerPacket).toList
-      log.debug("Sending tracked packet {} to {}", byteListToHex(d), to)
-      val frame = to match {
-        case to: XBeeAddress64 => sendWithFrame(f => TX64(f, to, TransmitOptionNormal, d))
-        case to: XBeeAddress16 => sendWithFrame(f => TX16(f, to, TransmitOptionNormal, d))
-      }
-      val result = receiveWithin(sendTimeout) {
-        case ReceivedCommand(_, TX_status((`frame`, status), Nil)) =>
-          status
-        case Timeout =>
-          TransmitStatusNoAckReceived
-      }
-      log.debug("Sending tracked packet to {} completed with result {}", to, result)
-      result
-    }
-    
-    
-    override def broadcastPacket(data: Seq[Byte]) = {
-      val d =  data.take(maxDataPerPacket).toList
-      log.debug("Broadcasting packet {}", byteListToHex(d))
-      //TODO xbee actually supports tracking of broadcast sends, make use of that
-      sendWithoutFrame(f => TX64(f, XBeeAddress64Broadcast, TransmitOption(true,true), d))
-    }
-    
-    def discover(timeout: Duration = 2500 ms) = child {
-      def handle(frame: FrameId, soFar: List[DiscoveredXBeeDevice] = Nil): List[DiscoveredXBeeDevice] @processCps = {
-        receiveWithin(timeout) {
-          case ReceivedCommand(_, AT.ND_node(((`frame`, status),a16,a64,signal,id), Nil)) =>
-            val a16o = if (a16 == XBeeAddress16Disabled) None else Some(a16)
-            val item = DiscoveredXBeeDevice(a64, a16o, Some(signal))
-            handle(frame, item :: soFar)
-          case ReceivedCommand(_, AT.ND_end((`frame`, status),Nil)) =>
-            soFar.reverse
-        }
-      }
-      def setTimeout(retry: Int): Boolean @processCps = {
-        val frame = sendWithFrame(f => AT.NT(f, timeout))
-        receiveWithin(localCommandTimeout) {
-          case ReceivedCommand(_, AT.NT_response(((frame, status), timeout), rest)) => 
-            if (status == AT.StatusOk) {
-              log.trace("Node discovery timeout set to {}", timeout)
-              true
-            } else if (retry > 0) setTimeout(retry - 1) else false
-          case Timeout => if (retry > 0) setTimeout(retry - 1) else false
-        }
-      }
-      
-      log.trace("Discovering nodes")
-      setTimeout(3)
-      val frame = sendWithFrame(f => AT.ND(f))      
-      val nodes = handle(frame)
-      log.debug("Discovered devices: {}", nodes)
-      nodes
-    }
-        
-    def incomingMessageProcessor(processor: Option[Process]) = cast { state =>
-      state.withForwardTo(processor)
-    }
-
-    override def close = cast_ { state =>
-      log.debug("Closing")
-      lowLevel.close
-      None
+    val x = fetchWithRetry(3)
+    x match { 
+      case Some(a) =>
+        val address = if (a == XBeeAddress16Disabled) None else Some(a)
+        log.debug("The alias of the local xbee is {}", address)
+        address
+      case None =>
+        log.error("Could not get the alias of the local xbee")
+        None
     }
   }
-  protected case class State(cachedAddress: Option[XBeeAddress64], multiplex: List[Process], frame: FrameId, forwardTo: Option[Process]) {
-    def addMultiplex(process: Process) = withMultiplex(process :: multiplex)
-    def removeMultiplex(process: Process) = withMultiplex(multiplex.filterNot(_ == process))
-    def withMultiplex(multiplex: List[Process]) = State(cachedAddress, multiplex, frame, forwardTo)
-    def withCachedAddress(cachedAddress: Option[XBeeAddress64]) = State(cachedAddress, multiplex, frame, forwardTo)
-    def nextFrame = State(cachedAddress, multiplex, frame++, forwardTo)
-    def withForwardTo(forwardTo: Option[Process]) = State(cachedAddress, multiplex, frame, forwardTo)
+
+  override def alias(alias: Option[XBeeAddress16]) = child {
+    log.debug("Setting alias address to {}", alias)
+    val a = alias.getOrElse(XBeeAddress16Disabled)
+    val frameId = sendWithFrame(f => AT.MY_set(f, a))
+    //TODO wait for confirmation
+    ()
   }
+
+  override def send(to: XBeeAddress, data: Seq[Byte]) = {
+    val d =  data.take(maxDataPerPacket).toList
+    log.debug("Sending untracket packet {} to {}", byteListToHex(d), to)
+    to match {
+      case to: XBeeAddress64 =>
+        sendWithoutFrame(f => TX64(f, to, TransmitOptionNormal, d))
+      case to: XBeeAddress16 =>
+        sendWithoutFrame(f => TX16(f, to, TransmitOptionNormal, d))
+    }
+  }
+  override def sendTracked(to: XBeeAddress, data: Seq[Byte]) = child {
+    val d =  data.take(maxDataPerPacket).toList
+    log.debug("Sending tracked packet {} to {}", byteListToHex(d), to)
+    val frame = to match {
+      case to: XBeeAddress64 => sendWithFrame(f => TX64(f, to, TransmitOptionNormal, d))
+      case to: XBeeAddress16 => sendWithFrame(f => TX16(f, to, TransmitOptionNormal, d))
+    }
+    val result = receiveWithin(sendTimeout) {
+      case LowLevelCommand(TX_status((`frame`, status), Nil)) =>
+        status
+      case Timeout =>
+        TransmitStatusNoAckReceived
+    }
+    log.debug("Sending tracked packet to {} completed with result {}", to, result)
+    result
+  }
+  override def broadcast(data: Seq[Byte]) = {
+    val d =  data.take(maxDataPerPacket).toList
+    log.debug("Broadcasting packet {}", byteListToHex(d))
+    sendWithoutFrame(f => TX64(f, XBeeAddress64Broadcast, TransmitOption(true,true), d))
+  }
+  
+  override def discover(timeout: Duration = 2500 ms) = child {
+    def handle(frame: FrameId, soFar: List[DiscoveredXBeeDevice] = Nil): List[DiscoveredXBeeDevice] @process = {
+      receiveWithin(timeout) {
+        case LowLevelCommand(AT.ND_node(((`frame`, status),a16,a64,signal,id), Nil)) =>
+          val a16o = if (a16 == XBeeAddress16Disabled) None else Some(a16)
+          val item = DiscoveredXBeeDevice(a64, a16o, Some(signal))
+          handle(frame, item :: soFar)
+        case LowLevelCommand(AT.ND_end((`frame`, status),Nil)) =>
+          soFar.reverse
+      }
+    }
+    def setTimeout(retries: Int = 3): Boolean @process = {
+      val frame = sendWithFrame(f => AT.NT(f, timeout))
+      receiveWithin(localCommandTimeout) {
+        case LowLevelCommand(AT.NT_response(((frame, status), timeout), rest)) => 
+          if (status == AT.StatusOk) {
+            log.trace("Node discovery timeout set to {}", timeout)
+            true
+          } else if (retries > 0) setTimeout(retries - 1) else false
+        case Timeout => if (retries > 0) setTimeout(retries - 1) else false
+      }
+    }
+    log.trace("Discovering nodes")
+    setTimeout()
+    val frame = sendWithFrame(f => AT.ND(f))      
+    val nodes = handle(frame)
+    log.debug("Discovered devices: {}", nodes)
+    nodes
+  }
+
+  override def close = stopAndWait
 }
+
+
+object LocalSeries1XBee {
+  def apply(lowLevel: => LocalLowLevelXBee @process, as: SpawnStrategy = SpawnAsRequiredChild) = {
+    val xbee = new LocalSeries1XBee {
+      override def openLowLevel = lowLevel
+    }
+    Spawner.start(xbee, as)
+  }
+} 
+    

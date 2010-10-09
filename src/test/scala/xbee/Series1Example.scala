@@ -18,9 +18,9 @@ spawn {
   println("Connecting to "+portDesc)
   val serialPort = portDesc.open(19200)(SpawnAsRequiredChild)
   println("Connected to "+portDesc)
-  val lowlevel = CommunicationPortLowLevelLocalXBeeInApiMode(serialPort)(SpawnAsRequiredChild)  
+  val lowlevel =  LocalLowLevelXBeeInApiModePort(serialPort).receive
   println("Connected lowlevel XBee")
-  val xbee = LocalSeries1XBee(lowlevel)(SpawnAsRequiredChild)
+  val xbee = LocalSeries1XBee(lowlevel)
 
   //Print the addresses of all other devices
   val peers = receive { xbee.discover() }
@@ -33,18 +33,20 @@ spawn {
   
   //Send 09080706 to all devices (one at a time)
   peers.foreach_cps { p =>
-    xbee.sendTrackedPacket(p.address64, 0x09 :: 0x08 :: 0x07 :: 0x06 :: Nil map(_.toByte))
+    xbee.sendTracked(p.address64, 0x09 :: 0x08 :: 0x07 :: 0x06 :: Nil map(_.toByte))
     receiveWithin(500 ms) { case Timeout => () }
   }
 
   //Broadcast 01020304 to all xbees
   val data = 0x01 :: 0x02 :: 0x03 :: 0x04 :: Nil map(_.toByte)
-  xbee.broadcastPacket(data);
+  xbee.broadcast(data);
 
   //Receive a message
-  xbee.incomingMessageProcessor(Some(self))
+  val rcv = self
+  xbee.setMessageHandler(rcv ! _)
+
   receiveWithin(20 seconds) {
-    case packet: XBeeDataPacket =>
+    case packet: ReceivedXBeeDataPacket =>
       println("Received: "+packet)
     case Timeout => 
       println("nothing received");

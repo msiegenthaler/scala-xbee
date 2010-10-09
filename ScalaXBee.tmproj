@@ -2,16 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>currentDocument</key>
-	<string>src/test/scala/xbee/LocalSeries1XBeeSpec.scala</string>
 	<key>documents</key>
 	<array>
 		<dict>
 			<key>children</key>
 			<array>
 				<dict>
-					<key>expanded</key>
-					<true/>
 					<key>name</key>
 					<string>scala</string>
 					<key>regexFolderFilter</key>
@@ -20,8 +16,6 @@
 					<string>src/main/scala</string>
 				</dict>
 				<dict>
-					<key>expanded</key>
-					<true/>
 					<key>name</key>
 					<string>resources</string>
 					<key>regexFolderFilter</key>
@@ -30,8 +24,6 @@
 					<string>src/main/resources</string>
 				</dict>
 			</array>
-			<key>expanded</key>
-			<true/>
 			<key>name</key>
 			<string>source</string>
 		</dict>
@@ -39,8 +31,6 @@
 			<key>children</key>
 			<array>
 				<dict>
-					<key>expanded</key>
-					<true/>
 					<key>name</key>
 					<string>scala</string>
 					<key>regexFolderFilter</key>
@@ -49,8 +39,6 @@
 					<string>src/test/scala</string>
 				</dict>
 				<dict>
-					<key>expanded</key>
-					<true/>
 					<key>name</key>
 					<string>resources</string>
 					<key>regexFolderFilter</key>
@@ -59,8 +47,6 @@
 					<string>src/test/resources</string>
 				</dict>
 			</array>
-			<key>expanded</key>
-			<true/>
 			<key>name</key>
 			<string>test</string>
 		</dict>
@@ -76,8 +62,6 @@
 					<string>project</string>
 				</dict>
 			</array>
-			<key>expanded</key>
-			<true/>
 			<key>name</key>
 			<string>project</string>
 		</dict>
@@ -85,44 +69,10 @@
 	<key>fileHierarchyDrawerWidth</key>
 	<integer>200</integer>
 	<key>metaData</key>
-	<dict>
-		<key>src/main/scala/xbee/LocalSeries1XBee.scala</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>7</integer>
-				<key>line</key>
-				<integer>243</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>208</integer>
-		</dict>
-		<key>src/test/scala/xbee/LocalSeries1XBeeSpec.scala</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>78</integer>
-				<key>line</key>
-				<integer>338</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>308</integer>
-		</dict>
-	</dict>
-	<key>openDocuments</key>
-	<array>
-		<string>src/main/scala/xbee/LocalSeries1XBee.scala</string>
-		<string>src/test/scala/xbee/LocalSeries1XBeeSpec.scala</string>
-	</array>
+	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{26, 4}, {1051, 1174}}</string>
+	<string>{{418, 4}, {1051, 1174}}</string>
 </dict>
 </plist>

@@ -1,10 +1,11 @@
-package ch.inventsoft.serialcommunication
+package ch.inventsoft
+package serialcommunication
 
-import ch.inventsoft.scalabase.communicationport._
-import ch.inventsoft.scalabase.time._
-import ch.inventsoft.scalabase.process._
-import ch.inventsoft.scalabase.oip._
 import java.io.{InputStream,OutputStream}
+import scalabase.io._
+import scalabase.time._
+import scalabase.process._
+import scalabase.oip._
 
 
 /**
@@ -12,7 +13,7 @@ import java.io.{InputStream,OutputStream}
  */
 trait SerialPortDescription {
   def name: String
-  def open(baudRate: Int)(as: SpawnStrategy): CommunicationPort @processCps
+  def open(baudRate: Int)(as: SpawnStrategy): CommunicationPort[Byte,Byte] @process
   override def toString = "SerialPort "+name
   override def equals(other: Any) = other match {
     case port: SerialPortDescription => port.name == name 
@@ -39,30 +40,34 @@ object SerialPort {
   def forName(name: String) =
     list.filter(_.name == name).headOption  
    
-  private class SerialPortDescriptionImpl(identifier: gnu.io.CommPortIdentifier) extends SerialPortDescription with SpawnableCompanion[SerialPortImpl] {
+  private class SerialPortDescriptionImpl(identifier: gnu.io.CommPortIdentifier) extends SerialPortDescription {
     override val name = identifier.getName
-    override def open(baudRate: Int)(as: SpawnStrategy): CommunicationPort @processCps = start(as) {
-      new SerialPortImpl(identifier, baudRate)
-    }
-  }
-  
-  private class SerialPortImpl(identifier: gnu.io.CommPortIdentifier, baudRate: Int) extends IOStreamPort[Process] {
-    protected override val readDelay: Duration = 30 ms
+    val timeout = 5 s
+    override def open(baudRate: Int)(as: SpawnStrategy): CommunicationPort[Byte,Byte] @process = {
+      val comPort = CommunicationPort[Byte,Byte,SerialPortState](
+        open = {
+          val p = identifier.open("Scala", timeout.amount(Milliseconds).toInt).asInstanceOf[gnu.io.SerialPort]
 
-    protected[this] override def openStreams: (InputStream, OutputStream, Process) @processCps = {
-      val timeout = 5 s
-      val port = identifier.open("Scala", timeout.amount(Milliseconds).toInt).asInstanceOf[gnu.io.SerialPort]
-      val kid = spawnChild(Required) {
-        ch.inventsoft.scalabase.process.receive {
-          case Terminate => port.close
-        }
-      }
-      port.setFlowControlMode(gnu.io.SerialPort.FLOWCONTROL_NONE)
-      port.setSerialPortParams(baudRate, gnu.io.SerialPort.DATABITS_8, gnu.io.SerialPort.STOPBITS_1, gnu.io.SerialPort.PARITY_NONE)
-      (port.getInputStream, port.getOutputStream, kid)
+          import gnu.io.SerialPort._
+          p.setFlowControlMode(FLOWCONTROL_NONE)
+          p.setSerialPortParams(baudRate, DATABITS_8, STOPBITS_1, PARITY_NONE)
+
+          val src = InputStreamSource(p.getInputStream)
+          val snk = OutputStreamSink(p.getOutputStream)
+          SerialPortState(p, src, snk)
+        },
+        close = { (sps: SerialPortState) =>
+          val s1 = sps.source.close
+          val s2 = sps.sink.close
+          s1.await; s2.await
+          sps.port.close
+        },
+        as = as
+      )
+      comPort.receive
     }
-    protected[this] override def closeAdditionalResource(kid: Process) = 
-      kid ! Terminate
   }
+
+  private case class SerialPortState(port: gnu.io.SerialPort, source: Source[Byte], sink: Sink[Byte])
 }
 

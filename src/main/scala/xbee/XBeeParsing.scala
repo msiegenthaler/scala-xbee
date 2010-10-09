@@ -1,7 +1,8 @@
-package ch.inventsoft.xbee
+package ch.inventsoft
+package xbee
 
-import ch.inventsoft.scalabase.binary.BytesParsing._
-import ch.inventsoft.scalabase.time._
+import scalabase.binary.BytesParsing._
+import scalabase.time._
 
 
 /**
@@ -258,10 +259,7 @@ object XBeeParsing {
   val TX_status = <<( fix_byte(0x89.toByte), frameId, transmitStatus) drop1
   
   
-  case class ReceiveOption(addressBroadcast: Boolean, panBroadcast: Boolean) {
-    def withAddressBroadcast(addressBroadcast: Boolean) = ReceiveOption(addressBroadcast,panBroadcast)
-    def withPanBroadcast(panBroadcast: Boolean) = ReceiveOption(addressBroadcast,panBroadcast)
-  }
+  case class ReceiveOption(addressBroadcast: Boolean, panBroadcast: Boolean)
   
   private val receiveOption = bit_byte.map(
         (o: ReceiveOption) => {

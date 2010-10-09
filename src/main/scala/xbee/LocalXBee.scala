@@ -1,7 +1,8 @@
-package ch.inventsoft.xbee
+package ch.inventsoft
+package xbee
 
-import ch.inventsoft.scalabase.time._
-import ch.inventsoft.scalabase.process._
+import scalabase.time._
+import scalabase.process._
 import Messages._
 import XBeeParsing._
 
@@ -13,15 +14,15 @@ trait LocalXBee {
   /**
    * Device address of the attached xbee 
    */
-  def address: MessageSelector[XBeeAddress64]
+  def address: Selector[XBeeAddress64] @process
   /**
    * The alias address of the attached xbee (16-bit addressing)
    */
-  def alias: MessageSelector[Option[XBeeAddress16]]
+  def alias: Selector[Option[XBeeAddress16]] @process
   /**
    * Sets the alias address of the attached xbee (16-bit addressing)
    */
-  def alias(alias: Option[XBeeAddress16]): Unit
+  def alias(alias: Option[XBeeAddress16]): Selector[Unit] @process
   
   /**
    * Maximum number of bytes that can be transmitted as one packet.
@@ -33,41 +34,45 @@ trait LocalXBee {
    * Does not check if the transmission was successful or if the remote xbee exists.
    * The data is truncated if it exceeds maxDataPerPacket. 
    */
-  def sendPacket(to: XBeeAddress, data: Seq[Byte]): Unit
+  def send(to: XBeeAddress, data: Seq[Byte]): Unit @process
   /**
    * Sends data to a remote XBee and tracks whether the transmission was successful. 
    * The data is truncated if it exceeds maxDataPerPacket. 
    */
-  def sendTrackedPacket(to: XBeeAddress, data: Seq[Byte]): MessageSelector[TransmitStatus]
+  def sendTracked(to: XBeeAddress, data: Seq[Byte]): Selector[TransmitStatus] @process
   /**
    * Broadcasts data to all XBees on the same PAN. 
    * The data is truncated if it exceeds maxDataPerPacket. 
    */
-  def broadcastPacket(data: Seq[Byte]): Unit
+  def broadcast(data: Seq[Byte]): Unit @process
   
   /**
    * Discover all xbees on the same PAN. 
    */
-  def discover(timeout: Duration = 2500 ms): MessageSelector[List[DiscoveredXBeeDevice]]
+  def discover(timeout: Duration = 2500 ms): Selector[List[DiscoveredXBeeDevice]] @process
   
   /**
-   * Sets the process that receives incoming messages from the XBee module.
-   * The messages are sent as XBeeDataPacket instances.
+   * Sets the handler for messages sent to this xbee.
+   * The handler is executed in the xbee's process, so it should be safe and short. In
+   * most cases it should just send a message to another process.
    */
-  def incomingMessageProcessor(processor: Option[Process]): Unit
+  def setMessageHandler(handler: ReceivedXBeeDataPacket => Unit @process): Unit @process
   
   /**
    * Close the communication to the xbee. This instance is no longer usable after calling close.
    */
-  def close: Unit
+  def close: Completion @process
 }
 
 /**
- * A packet received from another XBee. 
+ * A packet sent to the local xbee.
  */
-case class XBeeDataPacket(receivedBy: LocalXBee, source: XBeeAddress, signalStrength: Option[SignalStrength], broadcast: Boolean, data: Seq[Byte]) {
+case class ReceivedXBeeDataPacket(sender: XBeeAddress,
+                                  signalStrength: Option[SignalStrength],
+                                  broadcast: Boolean,
+                                  data: Seq[Byte]) {
   def length = data.size
-  override def toString = source.toString + ": "+data.map(_.toInt.toHexString+" ")
+  override def toString = sender.toString + ": "+data.map(_.toInt.toHexString+" ")
 }
 
 /**
