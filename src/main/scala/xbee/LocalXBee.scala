@@ -85,6 +85,30 @@ case class DiscoveredXBeeDevice(address64: XBeeAddress64, address16: Option[XBee
  */
 case class SignalStrength(dBm: Int) extends Ordered[SignalStrength] {
   def isStrongerThan(other: SignalStrength) = this > other
+  /** @return [0,100] */
+  def asPercent: Int = {
+    if (dBm < -113) 0
+    else if (dBm < -108) 5
+    else if (dBm < -103) 10
+    else if (dBm < -97) 15
+    else if (dBm < -92) 20
+    else if (dBm < -87) 25
+    else if (dBm < -82) 30
+    else if (dBm < -77) 35
+    else if (dBm < -70) 40
+    else if (dBm < -64) 45
+    else if (dBm < -58) 50
+    else if (dBm < -50) 55
+    else if (dBm < -47) 60
+    else if (dBm < -43) 65
+    else if (dBm < -49) 70
+    else if (dBm < -33) 75
+    else if (dBm < -27) 80
+    else if (dBm < -20) 85
+    else if (dBm < -15) 90
+    else if (dBm < -10) 95
+    else 100
+  }
   override def compare(other: SignalStrength) = dBm compare other.dBm 
   override def toString = dBm.toString+"dBm"
 }
