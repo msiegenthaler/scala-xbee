@@ -1,7 +1,7 @@
 import sbt._
 
 class ScalaXbeeProject(info: ProjectInfo) extends DefaultProject(info) with AutoCompilerPlugins {      
-  val continuations = compilerPlugin("org.scala-lang.plugins" % "continuations" % "2.8.0")
+  val continuations = compilerPlugin("org.scala-lang.plugins" % "continuations" % "2.8.1")
   override def compileOptions = CompileOption("-P:continuations:enable") :: CompileOption("-unchecked") :: super.compileOptions.toList
 
   override def packageSrcJar= defaultJarPath("-sources.jar")
