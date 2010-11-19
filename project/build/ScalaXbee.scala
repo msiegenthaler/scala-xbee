@@ -14,7 +14,7 @@ class ScalaXbeeProject(info: ProjectInfo) extends DefaultProject(info) with Auto
   val publishTo = Resolver.sftp("Inventsoft Publish", "foxtrot.inventsoft.ch", "/inventsoft/dev/mavenrepo/snapshot-repo")
   Credentials(Path.userHome / ".ivy2" / ".credentials", log)
 
-  val scalabase = "ch.inventsoft" % "scalabase_2.8.0" % "2.1.0-SNAPSHOT"
+  val scalabase = "ch.inventsoft" % "scalabase_2.8.1" % "2.1.0-SNAPSHOT"
   val rxtx = "rxtx" % "rxtx" % "20101024"
 
   val scalatest = "org.scalatest" % "scalatest" % "1.2" % "test"
