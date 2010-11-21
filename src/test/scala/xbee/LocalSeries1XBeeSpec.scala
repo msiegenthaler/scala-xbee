@@ -79,7 +79,7 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
       val (nh, unmatched) = applyHandlers(cmds.toList, state.deviceHandlers)
       state.copy(commands = state.commands ++ unmatched, deviceHandlers = nh)
     }
-    override def read = {
+    override def read(max: Int) = {
       log.trace("read: enqueuing")
       this ! new ModifyStateMessage with MessageWithSimpleReply[Read[Command]] {
         override def execute(state: State) = state.readBuffer match {
@@ -96,7 +96,7 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
         }
       }
     }.receive
-    override def read(timeout: Duration) = {
+    override def readWithin(timeout: Duration, max: Int) = {
       log.trace("read(timeout): enqueuing")
       this ! new ModifyStateMessage with MessageWithSimpleReply[Option[Read[Command]]] {
         override def execute(state: State) = state.readBuffer match {

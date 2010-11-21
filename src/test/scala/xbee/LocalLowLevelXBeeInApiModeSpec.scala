@@ -129,7 +129,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
     (container, xbee)
   }
   def checkNoPending(xbee: LocalLowLevelXBee): Unit @process = {
-    val res = xbee.read(200 ms)
+    val res = xbee.readWithin(200 ms)
     if (res.nonEmpty) fail("Failed checkNoPending: "+res.get)
     ()
   }
@@ -150,7 +150,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
         val (device, xbee) = initialize
         device.sendAsDevice(0x7e :: 0x00 :: 0x04 :: 0x08 :: 0x52 :: 0x4D :: 0x59 :: 0xFF :: Nil map(_.toByte))
 
-        val data = xbee.read(1 s).get
+        val data = xbee.readWithin(1 s).get
         data should be(mkData(0x08, 0x52, 0x4D, 0x59))
 
         checkNoPending(xbee)
@@ -164,7 +164,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
           checkNoPending(xbee)
           device.sendAsDevice(b :: Nil)
         }
-        val rec = xbee.read(1 s).get
+        val rec = xbee.readWithin(1 s).get
         rec should be(mkData(0x08, 0x52, 0x4D, 0x59))
 
         checkNoPending(xbee)
@@ -177,7 +177,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
         val c2 = 0x7e :: 0x00 :: 0x04 :: 0x08 :: 0x01 :: 0x44 :: 0x48 :: 0x6A :: Nil map(_.toByte)
         device.sendAsDevice(c1 ::: c2)
         
-        val r1 = xbee.read(1 s)
+        val r1 = xbee.readWithin(1 s)
         r1 should be(Some(Data(mkd(0x08, 0x52, 0x4D, 0x59) :: mkd(0x08, 0x01, 0x44, 0x48) :: Nil)))
 
         checkNoPending(xbee)
@@ -190,12 +190,12 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
         val c2 = 0x7e :: 0x00 :: 0x04 :: 0x08 :: 0x01 :: 0x44 :: 0x48 :: 0x6A :: Nil map(_.toByte)
         device.sendAsDevice(c1 ::: c2.take(3))
         
-        val r1 = xbee.read(2 s)
+        val r1 = xbee.readWithin(2 s)
         r1 should be(Some(mkData(0x08, 0x52, 0x4D, 0x59)))
         checkNoPending(xbee)
         
         device.sendAsDevice(c2.drop(3))
-        val r2 = xbee.read(2 s)
+        val r2 = xbee.readWithin(2 s)
         r2 should be(Some(mkData(0x08, 0x01, 0x44, 0x48)))
 
         checkNoPending(xbee)
@@ -208,7 +208,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
         val c1 = 0x7e :: 0x00 :: 0x04 :: 0x08 :: 0x52 :: 0x4D :: 0x59 :: 0xFF :: Nil map(_.toByte)
         device.sendAsDevice(junk ::: c1)
 
-        val r1 = xbee.read(1 s)
+        val r1 = xbee.readWithin(1 s)
         r1 should be(Some(mkData(0x08, 0x52, 0x4D, 0x59)))
 
         checkNoPending(xbee)
@@ -222,7 +222,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
         val c2 = 0x7e :: 0x00 :: 0x04 :: 0x08 :: 0x01 :: 0x44 :: 0x48 :: 0x6A :: Nil map(_.toByte)
         device.sendAsDevice(c1 ::: junk ::: c2)
         
-        val r1 = xbee.read(1 s)
+        val r1 = xbee.readWithin(1 s)
         r1 should be(Some(Data(mkd(0x08, 0x52, 0x4D, 0x59) :: mkd(0x08, 0x01, 0x44, 0x48) :: Nil)))
 
         checkNoPending(xbee)

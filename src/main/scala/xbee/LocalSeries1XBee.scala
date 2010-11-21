@@ -43,7 +43,7 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
   }
   /** Reader fun, that forwards all data read from the lowLevel */
   protected[this] def readFromLowLevel(lowLevel: LocalLowLevelXBee): Unit @process = {
-    val read = lowLevel.read(1 s)
+    val read = lowLevel.readWithin(1 s)
     read match {
       case Some(Data(items)) =>
         items.foreach_cps { cmd =>
