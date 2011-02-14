@@ -17,11 +17,11 @@ import XBeeParsing._
  */
 trait LocalSeries1XBee extends LocalXBee with StateServer {
   override val maxDataPerPacket = 100
-  protected[this] val getFrameTimeout = 1 s
-  protected[this] val localCommandTimeout = 5 s
-  protected[this] val sendTimeout = 2 minutes
+  protected val getFrameTimeout = 1 s
+  protected val localCommandTimeout = 5 s
+  protected val sendTimeout = 2 minutes
 
-  protected[this] type State = S1State
+  protected type State = S1State
   protected case class S1State(cachedAddress: Option[XBeeAddress64], multiplex: List[Process], frame: FrameId, incomingHandler: IncomingHandler, lowLevel: LocalLowLevelXBee, reader: Process) {
     def addMultiplex(process: Process) = copy(multiplex=process :: multiplex)
     def removeMultiplex(process: Process) = copy(multiplex=multiplex.filterNot(_ == process))
@@ -31,8 +31,8 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
   protected type FramedCommand = FrameId => Seq[Byte]
   protected type IncomingHandler = ReceivedXBeeDataPacket => Unit @process
 
-  protected[this] def openLowLevel: LocalLowLevelXBee @process
-  override protected[this] def init = {
+  protected def openLowLevel: LocalLowLevelXBee @process
+  override protected def init = {
     val lowLevel = ResourceManager[LocalLowLevelXBee](openLowLevel, _.close).receive.resource
     val reader = spawnChild(Required)(readFromLowLevel(lowLevel))
     spawnChild(NotMonitored) { 
@@ -42,7 +42,7 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
     S1State(None, Nil, FrameId(), _ => noop, lowLevel, reader)
   }
   /** Reader fun, that forwards all data read from the lowLevel */
-  protected[this] def readFromLowLevel(lowLevel: LocalLowLevelXBee): Unit @process = {
+  protected def readFromLowLevel(lowLevel: LocalLowLevelXBee): Unit @process = {
     val read = lowLevel.readWithin(1 s)
     read match {
       case Some(Data(items)) =>
@@ -65,7 +65,7 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
         }
     }
   }
-  protected[this] override def handler(state: State) = super.handler(state).orElse_cps {
+  protected override def handler(state: State) = super.handler(state).orElse_cps {
     case llc @ LowLevelCommand(command) => command match {
       case RX64((address, signal, option, data), Nil) =>
         log.debug("Received packet from {}: {} (signal: {}, options: {})",
@@ -97,11 +97,11 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
       noop
       Some(state.removeMultiplex(end.process))
   }
-  protected[this] override def termination(state: State) = {
+  protected override def termination(state: State) = {
     log.debug("Closing the XBee")
   }
 
-  protected[this] def child[A](body: => A @process): Selector[A] @process = {
+  protected def child[A](body: => A @process): Selector[A] @process = {
     this ! new ModifyStateMessage with MessageWithSimpleReply[A] {
       override def execute(state: State) = {
         val p = spawnChild(Monitored) {
@@ -112,16 +112,16 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
     }
   }
     
-  protected[this] def sendWithoutFrame(command: FramedCommand): Unit @process = cast { state =>
+  protected def sendWithoutFrame(command: FramedCommand): Unit @process = cast { state =>
     state.lowLevel.writeCast(command(NoFrameId))
     state
   }
-  protected[this] def sendWithFrame_(command: FramedCommand): Selector[FrameId] @process = call { state =>
+  protected def sendWithFrame_(command: FramedCommand): Selector[FrameId] @process = call { state =>
     val frame = state.frame
     state.lowLevel writeCast command(frame)
     (frame, state.nextFrame)
   }
-  protected[this] def sendWithFrame(command: FramedCommand): FrameId @process = {
+  protected def sendWithFrame(command: FramedCommand): FrameId @process = {
     val f = receiveWithin(getFrameTimeout) { sendWithFrame_(command).option }
     f.getOrElse(throw new RuntimeException("Could not get a frame id"))
   }
@@ -196,7 +196,7 @@ println("### "+other); None
     }
   }
 
-  protected[this] def cacheAddress(address: XBeeAddress64) = cast { state =>
+  protected def cacheAddress(address: XBeeAddress64) = cast { state =>
     if (state.cachedAddress.isEmpty) { 
       log.trace("Caching local xbee address {}", address)
       state.copy(cachedAddress = Some(address))

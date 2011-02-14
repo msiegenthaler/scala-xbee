@@ -31,12 +31,12 @@ object LocalLowLevelXBeeInApiModePort {
 
 /** Reveived commands from a source representing an xbee in api mode */
 trait LowLevelXBeeInApiModeSource extends TransformingSource[Byte,Command,Seq[Byte]] with Log {
-  protected[this] override def createAccumulator = Nil
-  protected[this] override def process(buffer: Seq[Byte], add: Seq[Byte]) = {
+  protected override def createAccumulator = Nil
+  protected override def process(buffer: Seq[Byte], add: Seq[Byte]) = {
     val (found,rest) = lookForPackets(buffer ++ add)
     (found,rest)
   }
-  protected[this] def lookForPackets(in: Seq[Byte], soFar: List[Command] = Nil): (Seq[Command],Seq[Byte]) = {
+  protected def lookForPackets(in: Seq[Byte], soFar: List[Command] = Nil): (Seq[Command],Seq[Byte]) = {
     val sr = UnescapedPacket.skipInvalid(in)
     if (sr.wasDataSkipped) log.info("XBee: Dropped data {}", byteListToHex(sr.skip))
     sr.data match {
@@ -65,8 +65,8 @@ object LowLevelXBeeInApiModeSource {
 
 /** Sends commands to the sink representing an xbee in api mode */
 trait LowLevelXBeeInApiModeSink extends TransformingSink[Command,Byte,Unit] with Log {
-  protected[this] override def createAccumulator = ()
-  protected[this] override def process(a: Unit, cmds: Seq[Command]) = {
+  protected override def createAccumulator = ()
+  protected override def process(a: Unit, cmds: Seq[Command]) = {
     val init: Seq[Byte] = Nil
     val data = cmds.foldLeft(init) { (soFar,command) =>
       val packet = UnescapedPacket(command)

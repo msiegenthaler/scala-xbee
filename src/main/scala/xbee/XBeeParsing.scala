@@ -284,7 +284,7 @@ object XBeeParsing {
   
   class NullTerminatedBytes extends ListFragment[Byte] {
     override val element = byte
-    override protected[this] def shouldAbort(bytes: Seq[Byte], soFar: List[Byte]) =
+    override protected def shouldAbort(bytes: Seq[Byte], soFar: List[Byte]) =
       bytes.isEmpty || soFar.headOption == 0 
   }
   def null_terminated_string(encoding: String) = new NullTerminatedBytes().map(

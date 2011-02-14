@@ -78,7 +78,7 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
 
 /*
   class TestCommunicationPort private() extends CommunicationPort with StateServer[PortState] with Device {
-    protected[this] override def initialState = PortState(Nil, Nil, None)
+    protected override def initialState = PortState(Nil, Nil, None)
     
     def send(data: Iterator[Byte]) = cast { state =>
       state.withInput(state.inputBuffer ++ data.toList)

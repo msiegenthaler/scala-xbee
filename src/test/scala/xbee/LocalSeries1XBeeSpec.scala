@@ -33,9 +33,9 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
                       readBuffer: List[Command],
                       deviceHandlers: List[Handler],
                       xbeeHandler: Option[Command => Unit @process])
-    protected[this] override type State = _State
+    protected override type State = _State
 
-    protected[this] override def init = {
+    protected override def init = {
       _State(Nil, Nil, Nil, None)
     }
 
