@@ -29,14 +29,13 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
     def apply() = Spawner.start(new TestLowLevelXBee, SpawnAsRequiredChild)
   }
   private class TestLowLevelXBee extends LocalLowLevelXBee with Device with StateServer with Log {
-    case class _State(commands: List[Command],
+    case class State(commands: List[Command],
                       readBuffer: List[Command],
                       deviceHandlers: List[Handler],
                       xbeeHandler: Option[Command => Unit @process])
-    protected override type State = _State
 
     protected override def init = {
-      _State(Nil, Nil, Nil, None)
+      State(Nil, Nil, Nil, None)
     }
 
     private def applyHandlers(command: Command, handlers: List[Handler], nonMatching: List[Handler]):

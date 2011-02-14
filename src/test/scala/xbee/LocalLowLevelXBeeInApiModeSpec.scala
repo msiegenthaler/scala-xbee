@@ -76,51 +76,6 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
     }
   }
 
-/*
-  class TestCommunicationPort private() extends CommunicationPort with StateServer[PortState] with Device {
-    protected override def initialState = PortState(Nil, Nil, None)
-    
-    def send(data: Iterator[Byte]) = cast { state =>
-      state.withInput(state.inputBuffer ++ data.toList)
-    }
-    override def receive = call { state =>
-      (state.outputBuffer, state.withOutput(Nil))
-    }
-    override def redirectIncomingTo(process: Option[Process]) = cast { state =>
-      val s1 = state.withForwardTo(process)
-      if (process.isDefined && !state.outputBuffer.isEmpty) {
-        process.get ! DataReceived(this, state.outputBuffer)
-        state.withOutput(Nil)
-      } else s1
-    }
-    
-    override def close = call_ { state =>
-      ((), None)
-    }
-
-    override def internalDeviceSends(data: Seq[Byte]) = cast { state =>
-      val newState = state.forwardTo match {
-	case Some(forwardTo) =>
-	  forwardTo ! DataReceived(this, data)
-	  state
-	case None =>
-	  state.withOutput(state.outputBuffer ++ data)
-      }
-      newState
-    }
-    override def internalDeviceReceive = call { state =>
-      (state.inputBuffer, state.withInput(Nil))
-    }
-  }
-  object TestCommunicationPort extends SpawnableCompanion[TestCommunicationPort] {
-    def apply(as: SpawnStrategy) = start(as)(new TestCommunicationPort)
-  }
-  case class PortState(inputBuffer: Seq[Byte], outputBuffer: Seq[Byte], forwardTo: Option[Process]) {
-    def withInput(inputBuffer: Seq[Byte]) = PortState(inputBuffer, outputBuffer, forwardTo)
-    def withOutput(outputBuffer: Seq[Byte]) = PortState(inputBuffer, outputBuffer, forwardTo)
-    def withForwardTo(forwardTo: Option[Process]) = PortState(inputBuffer, outputBuffer, forwardTo)
-  }
-  */
   def initialize: (Device, LocalLowLevelXBee) @process = {
     val container = new TestPortContainer
     container.start
@@ -239,4 +194,5 @@ class LocalLowLevelXBeeInApiModeSpec extends ProcessSpec with ShouldMatchers {
   def mkd(d: Int*) = {
     d.map(_.toByte).toList
   }
+
 }

@@ -21,8 +21,7 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
   protected val localCommandTimeout = 5 s
   protected val sendTimeout = 2 minutes
 
-  protected type State = S1State
-  protected case class S1State(cachedAddress: Option[XBeeAddress64], multiplex: List[Process], frame: FrameId, incomingHandler: IncomingHandler, lowLevel: LocalLowLevelXBee, reader: Process) {
+  protected case class State(cachedAddress: Option[XBeeAddress64], multiplex: List[Process], frame: FrameId, incomingHandler: IncomingHandler, lowLevel: LocalLowLevelXBee, reader: Process) {
     def addMultiplex(process: Process) = copy(multiplex=process :: multiplex)
     def removeMultiplex(process: Process) = copy(multiplex=multiplex.filterNot(_ == process))
     def nextFrame = copy(frame=frame++)
@@ -39,7 +38,7 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
       //prefetch address
       address
     }
-    S1State(None, Nil, FrameId(), _ => noop, lowLevel, reader)
+    State(None, Nil, FrameId(), _ => noop, lowLevel, reader)
   }
   /** Reader fun, that forwards all data read from the lowLevel */
   protected def readFromLowLevel(lowLevel: LocalLowLevelXBee): Unit @process = {
