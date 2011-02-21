@@ -1,8 +1,12 @@
-package ch.inventsoft.xbee
+package ch.inventsoft
+package xbee
 
 import org.scalatest._
 import matchers._
 import XBeeParsing._
+import scalabase.time._
+import scalabase.extcol.ListUtil
+
 
 class XBeeParsingSpec extends Spec with ShouldMatchers {
 
@@ -341,6 +345,24 @@ class XBeeParsingSpec extends Spec with ShouldMatchers {
     it("should not match a SH-response") {
       val data = List(-120, 1, 83, 72, 0, 1, 2, 3, 4) map(_.toByte)
       RX64.unapply(data) should be(None)
+    }
+  }
+
+  describe("ATNT") {
+    it("should support sending a NT command") {
+      val expect = 0x08 :: 0x01 :: 0x4E :: 0x54 :: 0x19 :: Nil map(_.toByte)
+      val command = AT.NT(FrameId(0x01), 2500 ms)
+      command should be(expect)
+    }
+    it("should support parsing a NT response 0") {
+      val data = 0x88 :: 0x01 :: 0x4E :: 0x54 :: 0x00 :: Nil map(_.toByte)
+      data match {
+        case AT.NT_response((frame,status), rest) =>
+          status should be(AT.StatusOk)
+          frame should be(FrameId(0x01))
+          rest should be(Nil)
+        case other => fail("Failed: "+ListUtil.byteListToHex(other))
+      }
     }
   }
   

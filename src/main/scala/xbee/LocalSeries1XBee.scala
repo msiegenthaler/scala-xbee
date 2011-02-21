@@ -137,16 +137,17 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
           val frame = sendWithFrame(f => AT.SL_read(f))
           log.trace("Send SL request")
           receiveWithin(localCommandTimeout) {
-            case LowLevelCommand(AT.SL_response(((`frame`, status), a), Nil)) => if (status == AT.StatusOk) {
-              //Got a valid response, now we got SL and SH
-              log.trace("Got SL response {}", a)
-              Some(sh + a)
-            } else requestSLAddress(retryCount - 1, sh)
+            case LowLevelCommand(AT.SL_response(((`frame`, status), a), Nil)) =>
+              if (status == AT.StatusOk) {
+                //Got a valid response, now we got SL and SH
+                log.trace("Got SL response {}", a)
+                Some(sh + a)
+              } else {
+                requestSLAddress(retryCount - 1, sh)
+              }
             case Timeout =>
               log.trace("No response to SL within timout")
               requestSLAddress(retryCount - 1, sh)
-            case other =>
-println("### "+other); None
           }
       }
     }
@@ -274,28 +275,33 @@ println("### "+other); None
   
   override def discover(timeout: Duration = 2500 ms) = child {
     def handle(frame: FrameId, soFar: List[DiscoveredXBeeDevice] = Nil): List[DiscoveredXBeeDevice] @process = {
-      receiveWithin(timeout) {
+      receiveWithin(timeout + (3 s)) {
         case LowLevelCommand(AT.ND_node(((`frame`, status),a16,a64,signal,id), Nil)) =>
           val a16o = if (a16 == XBeeAddress16Disabled) None else Some(a16)
           val item = DiscoveredXBeeDevice(a64, a16o, Some(signal))
           handle(frame, item :: soFar)
         case LowLevelCommand(AT.ND_end((`frame`, status),Nil)) =>
           soFar.reverse
+        case Timeout =>
+          soFar.reverse
       }
     }
     def setTimeout(retries: Int = 3): Boolean @process = {
+      log.trace("Sending NT request (discovery timeout to {})", timeout)
       val frame = sendWithFrame(f => AT.NT(f, timeout))
       receiveWithin(localCommandTimeout) {
-        case LowLevelCommand(AT.NT_response(((frame, status), timeout), rest)) => 
+        case LowLevelCommand(AT.NT_response((frame, status), rest)) => 
           if (status == AT.StatusOk) {
             log.trace("Node discovery timeout set to {}", timeout)
             true
           } else if (retries > 0) setTimeout(retries - 1) else false
-        case Timeout => if (retries > 0) setTimeout(retries - 1) else false
+        case Timeout => 
+          if (retries > 0) setTimeout(retries - 1) else false
       }
     }
     log.trace("Discovering nodes")
     setTimeout()
+    log.trace("Sending ND (discovery) request")
     val frame = sendWithFrame(f => AT.ND(f))      
     val nodes = handle(frame)
     log.debug("Discovered devices: {}", nodes)

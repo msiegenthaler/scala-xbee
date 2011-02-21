@@ -203,9 +203,10 @@ object XBeeParsing {
         t => Some(Duration((t & 0xFF) * 100, Milliseconds))
       )
     val NT = <<( AtCommandPreample('N','T'), time )>>
-    val NT_response = <<( AtResponsePreample('N','T'), time )>>
+    val NT_response = <<( AtResponsePreample('N','T'))>>
+
     
-    //TODO more AT commands
+    //more AT commands as needed...
   }
   
   case class TransmitOption(val ackDisabled: Boolean, val sendWithBroadcastPanId: Boolean) {

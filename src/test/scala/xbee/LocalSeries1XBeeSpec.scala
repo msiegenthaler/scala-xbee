@@ -485,7 +485,7 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
       val cs = device.commandsInBuffer
       cs match {
         case AT.NT((frameNt,timeout),rest) :: Nil =>
-          device.sendResponse(AT.NT_response((frameNt,AT.StatusOk),timeout))
+          device.sendResponse(AT.NT_response(frameNt,AT.StatusOk))
         case other => fail("Fail nt "+other)
       }
       sleep(200 ms)
@@ -516,7 +516,7 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
       val cs = device.commandsInBuffer 
       cs match {
         case AT.NT((frameNt,timeout),Nil) :: Nil =>
-          device.sendResponse(AT.NT_response((frameNt,AT.StatusOk),timeout))
+          device.sendResponse(AT.NT_response(frameNt,AT.StatusOk))
         case other => fail("Fail nt "+other.map(byteListToHex(_)))
       }
       sleep(500 ms)
