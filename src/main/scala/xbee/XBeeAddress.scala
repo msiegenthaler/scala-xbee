@@ -7,6 +7,8 @@ package xbee
  */
 sealed trait XBeeAddress {
   def isAddressable: Boolean
+  /** The address in uppercase hexadecimal representation, i.e. 0013A200403AD0A6 */
+  def asHex: String
 }
 
 
@@ -16,10 +18,11 @@ sealed trait XBeeAddress {
 sealed trait XBeeAddress16 extends XBeeAddress {
   val value: Short
   override def toString = {
+    "XBeeAddress16(0x"+asHex+")"
+  }
+  override def asHex = {
     val s = value.toHexString.toUpperCase
-    val hex = if (s.length>4) s.drop(s.length-4)
-      else "0" * (4-s.length) + s
-    "XBeeAddress16(0x"+hex+")"
+    if (s.length>4) s.drop(s.length-4) else "0" * (4-s.length) + s    
   }
   override def equals(other: Any) = other match {
     case a: XBeeAddress16 => a.value == value
@@ -56,9 +59,12 @@ case class XBeeAddress64(value: Long) extends XBeeAddress {
   def lowPart = XBeeAddress64_Low((value & 0xFFFFFFFF).toInt)
   def highPart = XBeeAddress64_High(((value >> 32) & 0xFFFFFFFF).toInt)
   def split = (highPart, lowPart)
+  override def asHex = {
+    val s = value.toHexString.toUpperCase
+    "0" * (16-s.length) + s
+  }
   override def toString = {
-    val s = value.toHexString
-    "XBeeAddress64(0x"+("0" * (16-s.length) + s).toUpperCase+")"
+    "XBeeAddress64(0x"+asHex+")"
   }
 }
 object XBeeAddress64Broadcast extends XBeeAddress64(0xFFFFL)  // see XBee-Addressing
