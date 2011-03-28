@@ -8,7 +8,10 @@ import scalabase.time._
 
 trait ProcessSpec extends Spec {
   protected def it_(name: String)(body: => Unit @process): Unit = it(name) {
-    spawnAndBlock(body)
+    spawnAndBlock {
+      processName(name)
+      body
+    }
   }
   
   import ShouldMatchers._

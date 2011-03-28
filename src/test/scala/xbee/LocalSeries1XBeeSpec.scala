@@ -154,6 +154,7 @@ class LocalSeries1XBeeSpec extends ProcessSpec with ShouldMatchers with Log {
     override def handlers = get(_.deviceHandlers).receiveWithin(1 s)
 
     override def close = stopAndWait
+    override def toString = "TestLowLevelXBee"
   }
   
 

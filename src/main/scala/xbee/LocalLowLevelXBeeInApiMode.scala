@@ -46,6 +46,7 @@ trait LowLevelXBeeInApiModeSource extends TransformingSource[Byte,Command,Seq[By
         (soFar.reverse, rest)
     }
   }
+  override def toString = "LowLevelXBeeInApiModeSource"
 }
 object LowLevelXBeeInApiModeSource {
   def apply(source: => Source[Byte] @process, as: SpawnStrategy = SpawnAsRequiredChild):
@@ -76,6 +77,7 @@ trait LowLevelXBeeInApiModeSink extends TransformingSink[Command,Byte,Unit] with
     }
     (data, ())
   }
+  override def toString = "LowLevelXBeeInApiModeSink"
 }
 object LowLevelXBeeInApiModeSink {
   def apply(sink: => Sink[Byte] @process, as: SpawnStrategy = SpawnAsRequiredChild):

@@ -10,6 +10,7 @@ import ch.inventsoft.scalabase.process.cps.CpsUtils._
 
 object Series1Example extends Application { 
   override def main(arg: Array[String]): Unit = spawnAndBlock {
+    processName("Series1Example")
     println("Serial Ports (usbserial)")
     SerialPort.list.foreach(e => println("  "+e))
 

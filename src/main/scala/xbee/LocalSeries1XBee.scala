@@ -309,6 +309,8 @@ trait LocalSeries1XBee extends LocalXBee with StateServer {
   }
 
   override def close = stopAndWait
+  
+  override def toString = "LocalSeries1XBee"
 }
 
 
